@@ -82,15 +82,10 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'weather_db',
-        'USER': 'postgres',
-        'PASSWORD': 'Admin',
-        'HOST': 'localhost', # host.docker.internal -> for docker container to connect to host machine
-        'PORT': '5432',
-    }
+    'default': dj_database_url.config(default=f"postgresql://postgres:password@localhost:5432/weather_db")
 }
 
 
