@@ -32,8 +32,7 @@ DEBUG = env.bool('DEBUG', default=True)
 
 GEMINI_API_KEY = env('GEMINI_API_KEY')
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 
 # Application definition
 
@@ -85,7 +84,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 import dj_database_url
 
 DATABASES = {
-    'default': dj_database_url.config(default=f"postgresql://postgres:password@localhost:5432/weather_db")
+    'default': dj_database_url.config(default=f"postgresql://postgres:Admin@localhost:5432/weather_db")
 }
 
 
