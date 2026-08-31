@@ -33,8 +33,8 @@ class TestFavoriteCity:
 
         api_client.force_authenticate(user=user)
         response = api_client.get('/api/favorite-cities/')
-        assert len(response.data) == 1
-        assert response.data[0]['city'] == 'Cairo, Egypt'
+        assert len(response.data['results']) == 1
+        assert response.data['results'][0]['city'] == 'Cairo, Egypt'
 
     def test_delete_favorite(self, auth_client):
         create_response = auth_client.post('/api/favorite-cities/', {'city': 'Cairo, Egypt'})

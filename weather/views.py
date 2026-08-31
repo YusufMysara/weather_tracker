@@ -4,7 +4,7 @@ from .models import FavoriteCity, WeatherRecord
 from .serializers import WeatherRecordSerializer
 import openpyxl
 from django.http import HttpResponse
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.db.models import Avg
 from django.utils import timezone
+from django.db import connection
 from datetime import timedelta
 import requests
 from django.db.models import Avg, Max, Min
@@ -42,9 +43,12 @@ class WeatherViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Up
             return [AllowAny()]
         return [IsAuthenticated()]
 
-    def get_throttles(self) -> list:
+    def get_throttles(self):
         if self.action == 'export':
             self.throttle_scope = 'export'
+            return [ScopedRateThrottle()]
+        if self.action in ['insights', 'forecast', 'ask']:
+            self.throttle_scope = 'ai'
             return [ScopedRateThrottle()]
         return super().get_throttles()
 
@@ -343,7 +347,6 @@ class WeatherViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Up
         })
 
 
-
 class FavoriteCityViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = FavoriteCitySerializer
@@ -356,3 +359,20 @@ class FavoriteCityViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, mixins
         if FavoriteCity.objects.filter(user=self.request.user, city=city).exists():
             raise ValidationError("You have already favorited this city.")
         serializer.save(user=self.request.user)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+    try:
+        connection.ensure_connection()
+        db_status = "ok"
+    except Exception as e:
+        db_status = f"unreachable: {str(e)}"
+
+    overall_status = "ok" if db_status == "ok" else "degraded"
+    status_code = 200 if overall_status == "ok" else 503
+
+    return Response({
+        "status": overall_status,
+        "database": db_status,
+    }, status=status_code)

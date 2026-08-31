@@ -15,12 +15,12 @@ class TestWeatherReadAccess:
     def test_list_filters_by_city(self, api_client, weather_record):
         response = api_client.get('/api/weather/?city=Cairo, Egypt')
         assert response.status_code == 200
-        assert all(r['city'] == 'Cairo, Egypt' for r in response.data)
+        assert all(r['city'] == 'Cairo, Egypt' for r in response.data['results'])
 
     def test_list_unknown_city_returns_empty(self, api_client, weather_record):
         response = api_client.get('/api/weather/?city=NotARealCity')
         assert response.status_code == 200
-        assert response.data == []
+        assert response.data['results'] == []
 
 
 class TestWeatherWriteAccess:
