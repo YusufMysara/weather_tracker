@@ -47,7 +47,7 @@ class WeatherViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Up
         if self.action == 'export':
             self.throttle_scope = 'export'
             return [ScopedRateThrottle()]
-        if self.action in ['insights', 'forecast', 'ask']:
+        if self.action in ['insights', 'forecast', 'ask', 'compare']:
             self.throttle_scope = 'ai'
             return [ScopedRateThrottle()]
         return super().get_throttles()
@@ -344,6 +344,64 @@ class WeatherViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Up
             "question": question,
             "answer": final.get("answer"),
             "raw_result": {"city": result_city, "metric": metric, "aggregation": aggregation, "value": result_value},
+        })
+
+    @extend_schema(
+    parameters=[
+        OpenApiParameter(name='cities', type=str, location=OpenApiParameter.QUERY,
+                        required=True, many=True,
+                        description='Repeat this param per city, e.g. ?cities=Cairo, Egypt&cities=Aswan, Egypt'),
+    ]
+    )
+    @action(detail=False, methods=['get'])
+    def compare(self, request):
+        cities = request.query_params.getlist('cities')
+
+        if len(cities) < 2:
+            return Response({"error": "provide at least two cities via ?cities=...&cities=..."}, status=400)
+
+        unknown = [c for c in cities if c not in settings.WEATHER_CITIES]
+        if unknown:
+            return Response({"error": f"unknown cities: {', '.join(unknown)}"}, status=404)
+
+        results = []
+        for city in cities:
+            latest = WeatherRecord.objects.filter(city=city).first()
+            if latest is None:
+                return Response({"error": f"no data available for {city}"}, status=404)
+            results.append({
+                "city": city,
+                "temperature": latest.temperature,
+                "humidity": latest.humidity,
+                "wind_speed": latest.wind_speed,
+                "recorded_at": latest.recorded_at,
+            })
+
+        comparison_text = "\n".join(
+            f"{r['city']}: {r['temperature']}°C, {r['humidity']}% humidity, {r['wind_speed']} km/h wind"
+            for r in results
+        )
+
+        prompt = (
+            f"Compare these cities' current weather:\n\n{comparison_text}\n\n"
+            "Respond ONLY with valid JSON, no markdown:\n"
+            '{"comparison": "one or two sentences highlighting the most notable difference(s) between these cities"}'
+        )
+
+        model = genai.GenerativeModel('gemini-3.5-flash-lite')
+        ai_response = model.generate_content(prompt)
+
+        if not ai_response.text:
+            return Response({"error": "AI returned an empty response"}, status=502)
+
+        try:
+            parsed = json.loads(ai_response.text)
+        except json.JSONDecodeError:
+            return Response({"error": "AI response could not be parsed"}, status=502)
+
+        return Response({
+            "cities": results,
+            "comparison": parsed.get("comparison"),
         })
 
 
