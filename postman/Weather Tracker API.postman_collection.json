@@ -359,6 +359,36 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Compare Cities (auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/weather/compare/?cities=Cairo, Egypt&cities=Aswan, Egypt",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "weather",
+                "compare",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "cities",
+                  "value": "Cairo, Egypt"
+                },
+                {
+                  "key": "cities",
+                  "value": "Aswan, Egypt"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },

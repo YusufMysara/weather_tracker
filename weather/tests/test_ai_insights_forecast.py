@@ -1,5 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
+from django.utils import timezone
+from weather.models import WeatherRecord
 
 pytestmark = pytest.mark.django_db
 
@@ -106,3 +108,37 @@ class TestForecast:
         response = auth_client.get('/api/weather/forecast/?city=Cairo, Egypt')
 
         assert response.status_code == 502
+
+class TestCompare:
+    def test_requires_auth(self, api_client, weather_record):
+        response = api_client.get('/api/weather/compare/?cities=Cairo, Egypt&cities=Alexandria, Egypt')
+        assert response.status_code == 401
+
+    def test_requires_at_least_two_cities(self, auth_client, weather_record):
+        response = auth_client.get('/api/weather/compare/?cities=Cairo, Egypt')
+        assert response.status_code == 400
+
+    def test_unknown_city_returns_404(self, auth_client, weather_record):
+        response = auth_client.get('/api/weather/compare/?cities=Cairo, Egypt&cities=Nowhere')
+        assert response.status_code == 404
+
+    def test_missing_data_for_valid_city_returns_404(self, auth_client, weather_record):
+        # Alexandria is a known city (in settings) but has no WeatherRecord yet
+        response = auth_client.get('/api/weather/compare/?cities=Cairo, Egypt&cities=Alexandria, Egypt')
+        assert response.status_code == 404
+
+    @patch('weather.views.genai.GenerativeModel')
+    def test_returns_comparison_for_two_valid_cities(self, mock_model_class, auth_client, weather_record):
+        alexandria_record = WeatherRecord.objects.create(
+            city="Alexandria, Egypt", temperature=27.0, humidity=55.0,
+            wind_speed=18.0, recorded_at=timezone.now(), source='api',
+        )
+        mock_model_class.return_value = make_gemini_mock(
+            '{"comparison": "Cairo is notably warmer and drier than Alexandria right now."}'
+        )
+
+        response = auth_client.get('/api/weather/compare/?cities=Cairo, Egypt&cities=Alexandria, Egypt')
+
+        assert response.status_code == 200
+        assert len(response.data['cities']) == 2
+        assert response.data['comparison'] is not None

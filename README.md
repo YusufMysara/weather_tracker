@@ -20,6 +20,10 @@ A Django REST Framework API that tracks live weather data across all 27 governor
 - **Swagger / OpenAPI docs** — full interactive API documentation at `/api/docs/`.
 - **Rate limiting** on the export endpoint via DRF throttling.
 - **Dockerized** — Redis, Django (via Gunicorn), Celery worker, and Celery Beat each run as separate services; Postgres runs natively/externally.
+- **Multi-city comparison** — `GET /api/weather/compare/?cities=<city1>&cities=<city2>` compares the latest readings of two or more cities, with an AI-generated one-line takeaway on the key difference.
+- **Pagination** — `GET /api/weather/` results are paginated (50 per page) via DRF's `PageNumberPagination`.
+- **Health check** — `GET /api/health/` reports API and database connectivity status, suitable for uptime monitoring.
+- **AI endpoint rate limiting** — `insights`, `forecast`, `ask`, and `compare` are throttled (10/hour) separately from general API usage, to protect Gemini API quota.
 
 ---
 
@@ -123,6 +127,26 @@ This starts Redis, the Django app (via Gunicorn), the Celery worker, and Celery 
 
 ---
 
+## Deployment
+
+Live deployment uses a split architecture:
+- **App hosting:** Railway (`web` service only — Gunicorn)
+- **Database:** [Neon](https://neon.tech) (managed Postgres, free tier)
+- **Redis/Celery worker/Beat:** not deployed — these remain local/Docker-only, since running them continuously exceeds Railway's free-tier resource allowance. The automated hourly fetch and email alerts are fully built and tested but only run in local/Docker environments currently.
+
+### Settings structure
+
+Settings are split by environment:
+Controlled via the `DJANGO_SETTINGS_MODULE` environment variable (`config.settings.local` or `config.settings.production`).
+
+### CI/CD
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the full pytest suite (against a temporary Postgres/Redis, not Neon) on every push and pull request targeting `main`. Deployment to Railway is gated on tests passing (`needs: test`).
+
+**Important:** never point local `.env` at the production `DATABASE_URL` — Django's test runner creates/destroys a test database on whatever `DATABASE_URL` is active, which can silently create orphaned databases or worse on a shared production database if misconfigured.
+
+---
+
 ## API Overview
 
 Full interactive documentation: `GET /api/docs/`
@@ -143,6 +167,8 @@ Full interactive documentation: `GET /api/docs/`
 | `/api/weather/export/` | GET | Auth | Download all records as `.xlsx` (5/hour limit) |
 | `/api/favorite-cities/` | GET/POST | Auth | List / create favorites |
 | `/api/favorite-cities/<id>/` | DELETE | Auth | Remove a favorite |
+| `/api/weather/compare/?cities=&cities=` | GET | Auth | Compare latest readings across two or more cities |
+| `/api/health/` | GET | Public | API + database health status |
 
 A ready-to-import Postman collection and environment are in `/postman`.
 
@@ -164,7 +190,7 @@ A ready-to-import Postman collection and environment are in `/postman`.
 pytest --cov=weather --cov-report=term-missing --cov-report=html
 ```
 
-Current coverage: **96%**.
+Current coverage: **95%+** (includes `compare`, `insights`, `forecast`, `ask`, and `fetch_weather_data`, all with mocked external calls).
 
 **What's covered:**
 - Public vs. authenticated access on all `WeatherRecord` actions
