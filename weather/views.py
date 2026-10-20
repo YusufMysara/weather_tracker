@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework import generics
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from .serializers import RegisterSerializer, FavoriteCitySerializer
 import google.generativeai as genai
 from django.conf import settings
@@ -20,6 +20,8 @@ from datetime import timedelta
 import requests
 from django.db.models import Avg, Max, Min
 from rest_framework.exceptions import ValidationError
+from django.contrib.auth.models import User
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 
@@ -39,8 +41,11 @@ class WeatherViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Up
         return WeatherRecord.objects.all()
     
     def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
+        if self.action in ['list', 'retrieve', 'latest']:
             return [AllowAny()]
+        if self.action in ['update', 'partial_update', 'destroy']:
+            # Records come from the scheduled fetch; only staff may correct or remove them.
+            return [IsAdminUser()]
         return [IsAuthenticated()]
 
     def get_throttles(self):
@@ -51,6 +56,12 @@ class WeatherViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Up
             self.throttle_scope = 'ai'
             return [ScopedRateThrottle()]
         return super().get_throttles()
+
+    @action(detail=False, methods=['get'])
+    def latest(self, request):
+        """Most recent reading for every tracked city (unpaginated)."""
+        records = WeatherRecord.objects.order_by('city', '-recorded_at').distinct('city')
+        return Response(self.get_serializer(records, many=True).data)
 
     @action(detail=False, methods=['get'])
     def export(self, request):
@@ -417,6 +428,22 @@ class FavoriteCityViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, mixins
         if FavoriteCity.objects.filter(user=self.request.user, city=city).exists():
             raise ValidationError("You have already favorited this city.")
         serializer.save(user=self.request.user)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def city_list(request):
+    return Response(list(settings.WEATHER_CITIES.keys()))
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def demo_login(request):
+    """Issue JWTs for a shared, passwordless demo account so visitors can try the app."""
+    user, created = User.objects.get_or_create(username='demo')
+    if created:
+        user.set_unusable_password()
+        user.save()
+    refresh = RefreshToken.for_user(user)
+    return Response({'access': str(refresh.access_token), 'refresh': str(refresh)})
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

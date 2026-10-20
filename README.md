@@ -2,12 +2,14 @@
 
 A Django REST Framework API that tracks live weather data across all 27 governorate capitals of Egypt, with JWT authentication, per-user favorites, threshold-based email alerts, AI-generated insights and forecasts, and Excel export — built on Postgres, Redis, and Celery.
 
+**Live demo:** https://weathertracker-production-6677.up.railway.app/ — click **Try demo** to explore the AI features without signing up. Interactive API docs: [/api/docs/](https://weathertracker-production-6677.up.railway.app/api/docs/).
+
 ---
 
 ## Features
 
 - **Automated data collection** — Celery Beat triggers an hourly fetch from the [Open-Meteo](https://open-meteo.com/) API for all 27 tracked cities, storing each reading as a `WeatherRecord`.
-- **JWT authentication** — public read access; write actions (update, delete, export, AI endpoints) require a logged-in user. Open registration.
+- **JWT authentication** — public read access; export and the AI endpoints require a logged-in user, and editing or deleting records is staff-only. Open registration.
 - **City filtering** — `GET /api/weather/?city=<name>` filters records server-side.
 - **Computed temperature difference** — each record shows its change vs. the previous reading for that city, computed live (never stored, so it can't go stale).
 - **Favorites** — authenticated users can save cities they care about (`FavoriteCity`), enforced unique per user via a database constraint.
@@ -16,14 +18,15 @@ A Django REST Framework API that tracks live weather data across all 27 governor
   - `insights` — plain-language trend summary, suggested activities, safety warnings, and anomaly detection against a 7-day rolling average.
   - `forecast` — real 3-day forecast data from Open-Meteo, narrated in plain language (the AI never invents the numbers — it only explains real forecast data).
   - `ask` — free-text natural language questions (e.g. *"What's the hottest city right now?"*) answered against real database queries. The AI only decides *what* to look up (city/metric/aggregation, from a fixed set of valid options); the actual computation always happens in Django, never in the AI response.
-- **Threshold email alerts** — proof-of-concept: the Celery task sends an email when a fetched temperature exceeds a set threshold (see [Known Limitations](#known-limitations)).
+- **Threshold email alerts** — proof-of-concept: the Celery task sends an email when a fetched temperature exceeds a set threshold.
 - **Swagger / OpenAPI docs** — full interactive API documentation at `/api/docs/`.
 - **Rate limiting** on the export endpoint via DRF throttling.
 - **Dockerized** — Redis, Django (via Gunicorn), Celery worker, and Celery Beat each run as separate services; Postgres runs natively/externally.
 - **Multi-city comparison** — `GET /api/weather/compare/?cities=<city1>&cities=<city2>` compares the latest readings of two or more cities, with an AI-generated one-line takeaway on the key difference.
 - **Pagination** — `GET /api/weather/` results are paginated (50 per page) via DRF's `PageNumberPagination`.
 - **Health check** — `GET /api/health/` reports API and database connectivity status, suitable for uptime monitoring.
-- **AI endpoint rate limiting** — `insights`, `forecast`, `ask`, and `compare` are throttled (10/hour) separately from general API usage, to protect Gemini API quota.
+- **AI endpoint rate limiting** — `insights`, `forecast`, `ask`, and `compare` are throttled (100/hour) separately from general API usage, to protect Gemini API quota.
+- **Web frontend** — a minimal, dependency-free single-page UI in `frontend/` (plain HTML/CSS/JS, served at `/` by WhiteNoise). Dashboard of latest readings, per-city history, AI insights/forecast, ask, compare, favorites, Excel export, login/register, and a one-click **Try demo** login (`POST /api/demo-login/`, a shared passwordless account).
 
 ---
 
@@ -51,26 +54,31 @@ A Django REST Framework API that tracks live weather data across all 27 governor
 ```
 weather_tracker/
 ├── config/
-│   ├── settings.py
+│   ├── settings/
+│   │   ├── base.py         # shared settings
+│   │   ├── local.py        # local development
+│   │   └── production.py   # Railway / Neon
 │   ├── urls.py
 │   ├── celery.py
 │   └── wsgi.py
 ├── weather/
-│   ├── models.py          # WeatherRecord, FavoriteCity
+│   ├── models.py           # WeatherRecord, FavoriteCity
 │   ├── serializers.py
-│   ├── views.py            # WeatherViewSet, FavoriteCityViewSet, RegisterView
+│   ├── views.py            # WeatherViewSet, FavoriteCityViewSet, RegisterView, health/cities/demo-login
 │   ├── urls.py
-│   ├── tasks.py             # fetch_weather_data (Celery task)
-│   ├── conftest.py          # pytest fixtures
+│   ├── tasks.py            # fetch_weather_data (Celery task)
+│   ├── conftest.py         # pytest fixtures
 │   └── tests/
-├── docker-compose.yml
+├── frontend/               # demo client: index.html, style.css, app.js
+├── .github/workflows/ci.yml
+├── docker-compose.yaml
 ├── Dockerfile
 ├── requirements.txt
 ├── pytest.ini
-├── .env                     # not committed — see Environment Variables
+├── .env                    # not committed — see Environment Variables
 └── postman/
-    ├── weather_tracker.postman_collection.json
-    └── weather_tracker.postman_environment.json
+    ├── Weather Tracker API.postman_collection.json
+    └── Weather.postman_environment.json
 ```
 
 ---
@@ -81,7 +89,6 @@ Create a `.env` file at the project root (never commit this):
 
 ```env
 SECRET_KEY=your-django-secret-key
-DEBUG=True
 GEMINI_API_KEY=your-gemini-api-key
 ```
 
@@ -117,7 +124,7 @@ Redis must be running (`docker run -d -p 6379:6379 redis` is the simplest option
 
 ## Getting Started (Docker)
 
-Postgres runs natively/externally, not inside Compose — set `HOST` in `settings.py`'s `DATABASES` to `host.docker.internal` (Docker Desktop's DNS name for the host machine).
+Postgres runs natively/externally, not inside Compose — set the database host (`DATABASE_URL`, or `DATABASES` in `config/settings/local.py`) to `host.docker.internal` (Docker Desktop's DNS name for the host machine).
 
 ```bash
 docker-compose up --build
@@ -158,8 +165,8 @@ Full interactive documentation: `GET /api/docs/`
 | `/api/token/refresh/` | POST | Public | Refresh an access token |
 | `/api/weather/` | GET | Public | List records (supports `?city=`) |
 | `/api/weather/<id>/` | GET | Public | Retrieve one record |
-| `/api/weather/<id>/` | PATCH/PUT | Auth | Update a record |
-| `/api/weather/<id>/` | DELETE | Auth | Delete a record |
+| `/api/weather/<id>/` | PATCH/PUT | Staff | Update a record |
+| `/api/weather/<id>/` | DELETE | Staff | Delete a record |
 | `/api/weather/` | POST | — | Not available — records are only created by the scheduled fetch |
 | `/api/weather/insights/?city=` | GET | Auth | AI trend summary, activities, warnings, anomaly detection |
 | `/api/weather/forecast/?city=` | GET | Auth | Real 3-day forecast, AI-narrated |
@@ -169,6 +176,9 @@ Full interactive documentation: `GET /api/docs/`
 | `/api/favorite-cities/<id>/` | DELETE | Auth | Remove a favorite |
 | `/api/weather/compare/?cities=&cities=` | GET | Auth | Compare latest readings across two or more cities |
 | `/api/health/` | GET | Public | API + database health status |
+| `/api/weather/latest/` | GET | Public | Newest reading for every city (unpaginated) |
+| `/api/cities/` | GET | Public | List of tracked city names |
+| `/api/demo-login/` | POST | Public | JWT tokens for the shared demo account |
 
 A ready-to-import Postman collection and environment are in `/postman`.
 

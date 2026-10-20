@@ -28,8 +28,14 @@ class TestWeatherWriteAccess:
         response = api_client.patch(f'/api/weather/{weather_record.id}/', {'humidity': 55.0})
         assert response.status_code == 401
 
-    def test_update_succeeds_when_authenticated(self, auth_client, weather_record):
+    def test_update_forbidden_for_regular_user(self, auth_client, weather_record):
         response = auth_client.patch(f'/api/weather/{weather_record.id}/', {'humidity': 55.0})
+        assert response.status_code == 403
+        weather_record.refresh_from_db()
+        assert weather_record.humidity == 40.0
+
+    def test_update_succeeds_for_staff(self, admin_client, weather_record):
+        response = admin_client.patch(f'/api/weather/{weather_record.id}/', {'humidity': 55.0})
         assert response.status_code == 200
         assert response.data['humidity'] == 55.0
 
@@ -37,8 +43,13 @@ class TestWeatherWriteAccess:
         response = api_client.delete(f'/api/weather/{weather_record.id}/')
         assert response.status_code == 401
 
-    def test_delete_succeeds_when_authenticated(self, auth_client, weather_record):
+    def test_delete_forbidden_for_regular_user(self, auth_client, weather_record):
         response = auth_client.delete(f'/api/weather/{weather_record.id}/')
+        assert response.status_code == 403
+        weather_record.refresh_from_db()  # still exists
+
+    def test_delete_succeeds_for_staff(self, admin_client, weather_record):
+        response = admin_client.delete(f'/api/weather/{weather_record.id}/')
         assert response.status_code == 204
 
     def test_create_does_not_exist(self, auth_client):

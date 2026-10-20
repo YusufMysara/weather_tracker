@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather Tracker</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Weather Tracker</h1>
+    <nav>
+      <button data-tab="dashboard" class="active">Dashboard</button>
+      <button data-tab="ask">Ask</button>
+      <button data-tab="compare">Compare</button>
+      <button data-tab="favorites">Favorites</button>
+      <a class="docs-link" href="/api/docs/" target="_blank" rel="noopener">API Docs ↗</a>
+    </nav>
+    <div id="auth"></div>
+  </header>
+
+  <aside class="intro">
+    <p>
+      <strong>A Django REST API with a demo client.</strong>
+      A Celery task collects readings for Egypt's 27 governorate capitals from Open-Meteo every hour into Postgres.
+      JWT auth protects the write and AI endpoints, and Gemini turns real data into insights, forecasts and answers.
+      The AI never invents numbers.
+      <em>The scheduled worker runs locally and in Docker, not on this free-tier host, so the readings shown here
+      come from its last run.</em>
+    </p>
+    <p class="chips">
+      <span>Django REST Framework</span><span>PostgreSQL</span><span>Celery + Redis</span>
+      <span>JWT</span><span>Gemini</span><span>Docker</span><span>GitHub Actions CI</span>
+    </p>
+    <p>
+      <strong>Try it:</strong> click <em>Try demo</em> (top right), open a city, then <em>AI insights</em>.
+      Every result has a <em>raw JSON</em> toggle showing the exact API call behind it.
+      <a href="https://github.com/YusufMysara/weather_tracker" target="_blank" rel="noopener">Source on GitHub ↗</a>
+    </p>
+  </aside>
+
+  <main>
+    <p id="message" hidden></p>
+
+    <section id="tab-dashboard">
+      <p class="muted">Latest reading for each of Egypt's 27 governorate capitals. Click a city for details.</p>
+      <div id="summary" class="summary"></div>
+      <p id="updated" class="muted"></p>
+      <div id="latest-trace"></div>
+      <div class="toolbar controls">
+        <input id="search" type="search" placeholder="Search cities…" aria-label="Search cities">
+        <select id="sort" aria-label="Sort cities">
+          <option value="city">Sort: A–Z</option>
+          <option value="temp-desc">Hottest first</option>
+          <option value="temp-asc">Coolest first</option>
+          <option value="humidity-desc">Most humid</option>
+          <option value="wind-desc">Windiest</option>
+        </select>
+        <button id="export-btn">Export to Excel</button>
+      </div>
+      <div id="city-grid" class="city-grid"></div>
+
+      <div id="city-detail" hidden>
+        <h2 id="city-title"></h2>
+        <div class="toolbar">
+          <button id="insights-btn">AI insights</button>
+          <button id="forecast-btn">3-day forecast</button>
+          <button id="fav-btn">Add to favorites</button>
+        </div>
+        <div id="ai-output"></div>
+        <h3>History</h3>
+        <table id="history-table">
+          <thead><tr><th>Recorded</th><th>Temp (°C)</th><th>Change</th><th>Humidity (%)</th><th>Wind (km/h)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-ask" hidden>
+      <p class="muted">Ask a question like "What's the hottest city right now?" or "Average humidity in Cairo".</p>
+      <form id="ask-form">
+        <input id="ask-input" placeholder="Your question" required>
+        <button type="submit">Ask</button>
+      </form>
+      <div id="ask-output"></div>
+    </section>
+
+    <section id="tab-compare" hidden>
+      <p class="muted">Pick two or more cities to compare their latest readings.</p>
+      <form id="compare-form">
+        <div id="compare-cities" class="checkbox-grid"></div>
+        <button type="submit">Compare</button>
+      </form>
+      <div id="compare-output"></div>
+    </section>
+
+    <section id="tab-favorites" hidden>
+      <ul id="fav-list"></ul>
+    </section>
+  </main>
+
+  <dialog id="auth-dialog">
+    <form method="dialog" id="auth-form">
+      <h2 id="auth-title">Log in</h2>
+      <input id="auth-username" placeholder="Username" required autocomplete="username">
+      <input id="auth-email" type="email" placeholder="Email" hidden>
+      <input id="auth-password" type="password" placeholder="Password" required autocomplete="current-password">
+      <div class="toolbar">
+        <button type="submit">Submit</button>
+        <button type="button" id="auth-cancel">Cancel</button>
+      </div>
+      <p class="muted"><a href="#" id="auth-switch">Need an account? Register</a></p>
+    </form>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>

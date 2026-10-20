@@ -28,6 +28,13 @@ def auth_client(api_client, user):
 
 
 @pytest.fixture
+def admin_client(db):
+    client = APIClient()
+    client.force_authenticate(user=User.objects.create_user(username='staffuser', password='testpass123', is_staff=True))
+    return client
+
+
+@pytest.fixture
 def weather_record(db):
     return WeatherRecord.objects.create(
         city="Cairo, Egypt",
