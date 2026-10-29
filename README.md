@@ -150,7 +150,7 @@ Controlled via the `DJANGO_SETTINGS_MODULE` environment variable (`config.settin
 
 ### CI/CD
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the full pytest suite (against a temporary Postgres/Redis, not Neon) on every push and pull request targeting `main`. Deployment to Railway is gated on tests passing (`needs: test`).
+GitHub Actions (`.github/workflows/ci.yml`) runs the full pytest suite (against a temporary Postgres/Redis, not Neon) on every push and pull request targeting `main`. Railway deploys only after the GitHub Actions run passes (Railway's Wait for CI setting).
 
 **Important:** never point local `.env` at the production `DATABASE_URL` — Django's test runner creates/destroys a test database on whatever `DATABASE_URL` is active, which can silently create orphaned databases or worse on a shared production database if misconfigured.
 
