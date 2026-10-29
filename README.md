@@ -1,5 +1,7 @@
 # Weather Tracker API
 
+[![CI](https://github.com/YusufMysara/weather_tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/YusufMysara/weather_tracker/actions/workflows/ci.yml)
+
 A Django REST Framework API that tracks live weather data across all 27 governorate capitals of Egypt, with JWT authentication, per-user favorites, threshold-based email alerts, AI-generated insights and forecasts, and Excel export — built on Postgres, Redis, and Celery.
 
 **Live demo:** https://weathertracker-production-6677.up.railway.app/ — click **Try demo** to explore the AI features without signing up. Interactive API docs: [/api/docs/](https://weathertracker-production-6677.up.railway.app/api/docs/).
@@ -14,7 +16,7 @@ A Django REST Framework API that tracks live weather data across all 27 governor
 - **Computed temperature difference** — each record shows its change vs. the previous reading for that city, computed live (never stored, so it can't go stale).
 - **Favorites** — authenticated users can save cities they care about (`FavoriteCity`), enforced unique per user via a database constraint.
 - **Excel export** — `GET /api/weather/export/` streams a real `.xlsx` file of all records, rate-limited to 5/hour.
-- **AI-powered endpoints** (Google Gemini):
+- **Four AI-powered endpoints** (Google Gemini): `insights`, `forecast`, `ask`, and `compare` (described under *Multi-city comparison* below):
   - `insights` — plain-language trend summary, suggested activities, safety warnings, and anomaly detection against a 7-day rolling average.
   - `forecast` — real 3-day forecast data from Open-Meteo, narrated in plain language (the AI never invents the numbers — it only explains real forecast data).
   - `ask` — free-text natural language questions (e.g. *"What's the hottest city right now?"*) answered against real database queries. The AI only decides *what* to look up (city/metric/aggregation, from a fixed set of valid options); the actual computation always happens in Django, never in the AI response.
@@ -85,7 +87,7 @@ weather_tracker/
 
 ## Environment Variables
 
-Create a `.env` file at the project root (never commit this):
+Copy `.env.example` to `.env` at the project root and fill in your values (never commit `.env`). `SECRET_KEY` and `GEMINI_API_KEY` are required; `DATABASE_URL` and `REDIS_URL` fall back to local defaults; `ALLOWED_HOSTS` is only read by the production settings.
 
 ```env
 SECRET_KEY=your-django-secret-key
@@ -184,6 +186,18 @@ A ready-to-import Postman collection and environment are in `/postman`.
 
 ---
 
+## Screenshots
+
+<!-- TODO: add screenshots of the dashboard, AI insights/forecast, and the Swagger docs here. -->
+
+---
+
+## Limitations
+
+- **The Celery worker and Beat run only in Docker / locally, not on the Railway deployment.** Railway runs the `web` service only, so the live demo shows the API and the data already in the database; the hourly fetch and the email alerts do not run there.
+
+---
+
 ## Design Decisions Worth Knowing
 
 - **`temperature_diff` is computed, not stored** — calculated live in the serializer by querying the previous record for that city, so it can never go stale if records are edited or deleted.
@@ -200,7 +214,7 @@ A ready-to-import Postman collection and environment are in `/postman`.
 pytest --cov=weather --cov-report=term-missing --cov-report=html
 ```
 
-Current coverage: **95%+** (includes `compare`, `insights`, `forecast`, `ask`, and `fetch_weather_data`, all with mocked external calls).
+Current status: **54 tests, 95% total coverage** (includes `compare`, `insights`, `forecast`, `ask`, and `fetch_weather_data`, all with mocked external calls).
 
 **What's covered:**
 - Public vs. authenticated access on all `WeatherRecord` actions
@@ -212,3 +226,8 @@ Current coverage: **95%+** (includes `compare`, `insights`, `forecast`, `ask`, a
 - All external calls (Gemini, Open-Meteo) are mocked in tests — no real network calls or API costs are incurred by running the test suite
 
 **A real bug found via testing:** writing tests for `ask` surfaced an `UnboundLocalError` that only occurred on the `aggregation: "latest"` branch — a variable was defined inside one conditional branch but used after both branches merged, so it worked for every case manually tested (`max`, `avg`) but crashed on the one untested branch (`latest`). Fixed, and now covered by a dedicated regression test.
+---
+
+## License
+
+[MIT](LICENSE) © 2026 Youssef Mysara
