@@ -188,7 +188,17 @@ A ready-to-import Postman collection and environment are in `/postman`.
 
 ## Screenshots
 
-<!-- TODO: add screenshots of the dashboard, AI insights/forecast, and the Swagger docs here. -->
+The dashboard: latest reading for all 27 cities, with the hottest, coolest, most humid and windiest at the top.
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+A city page after **Try demo**, with insights loaded: summary, suggested activities, warnings, the comparison with the 7-day average, and the reading history underneath.
+
+![City insights for Cairo](docs/screenshots/city-insights.png)
+
+The `weather` endpoints in the Swagger docs (`/api/docs/`):
+
+![Weather API endpoints](docs/screenshots/api-endpoints.png)
 
 ---
 
