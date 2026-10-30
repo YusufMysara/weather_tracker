@@ -15,11 +15,12 @@ A Django REST Framework API that tracks live weather data across all 27 governor
 - **City filtering** — `GET /api/weather/?city=<name>` filters records server-side.
 - **Computed temperature difference** — each record shows its change vs. the previous reading for that city, computed live (never stored, so it can't go stale).
 - **Favorites** — authenticated users can save cities they care about (`FavoriteCity`), enforced unique per user via a database constraint.
-- **Excel export** — `GET /api/weather/export/` streams a real `.xlsx` file of all records, rate-limited to 5/hour.
-- **Four AI-powered endpoints** (Google Gemini): `insights`, `forecast`, `ask`, and `compare` (described under *Multi-city comparison* below):
+- **Excel export** — `GET /api/weather/export/` streams a real `.xlsx` file of all records, rate-limited to 50/hour.
+- **Four AI-powered endpoints** (Google Gemini), all under `/api/weather/`: `insights`, `forecast`, `ask`, and `compare`:
   - `insights` — plain-language trend summary, suggested activities, safety warnings, and anomaly detection against a 7-day rolling average.
   - `forecast` — real 3-day forecast data from Open-Meteo, narrated in plain language (the AI never invents the numbers — it only explains real forecast data).
   - `ask` — free-text natural language questions (e.g. *"What's the hottest city right now?"*) answered against real database queries. The AI only decides *what* to look up (city/metric/aggregation, from a fixed set of valid options); the actual computation always happens in Django, never in the AI response.
+  - `compare` — latest readings of two or more cities side by side, with a one-line takeaway from Gemini on the key difference (see *Multi-city comparison* below).
 - **Threshold email alerts** — proof-of-concept: the Celery task sends an email when a fetched temperature exceeds a set threshold.
 - **Swagger / OpenAPI docs** — full interactive API documentation at `/api/docs/`.
 - **Rate limiting** on the export endpoint via DRF throttling.
@@ -173,7 +174,7 @@ Full interactive documentation: `GET /api/docs/`
 | `/api/weather/insights/?city=` | GET | Auth | AI trend summary, activities, warnings, anomaly detection |
 | `/api/weather/forecast/?city=` | GET | Auth | Real 3-day forecast, AI-narrated |
 | `/api/weather/ask/` | POST | Auth | Natural-language question answering |
-| `/api/weather/export/` | GET | Auth | Download all records as `.xlsx` (5/hour limit) |
+| `/api/weather/export/` | GET | Auth | Download all records as `.xlsx` (50/hour limit) |
 | `/api/favorite-cities/` | GET/POST | Auth | List / create favorites |
 | `/api/favorite-cities/<id>/` | DELETE | Auth | Remove a favorite |
 | `/api/weather/compare/?cities=&cities=` | GET | Auth | Compare latest readings across two or more cities |
